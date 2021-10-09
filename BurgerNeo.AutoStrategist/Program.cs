@@ -13,25 +13,46 @@ using Neo.Wallets;
 using Neo.VM;
 using Utility = Neo.Network.RPC.Utility;
 
-namespace BurgerNeo.Dispatcher
+namespace BurgerNeo.AutoStrategist
 {
-    class Program
+    class AutoStrategist
     {
         static OperatingSystem os = System.Environment.OSVersion;
         static UInt160 burgerneo_contract = UInt160.Parse("0x48c40d4666f93408be1bef038b6722404d9a4c2a");
         static UInt160 neo_contract = NativeContract.NEO.Hash;
 
-        // secret key of BurgerNeo Strategist in Wallet Import Format
-        static string wif = Environment.GetEnvironmentVariable("BURGERNEO-WIF", EnvironmentVariableTarget.User)!;
-        static KeyPair keypair = Utility.GetKeyPair(wif);
-        static UInt160 contract = Contract.CreateSignatureContract(keypair.PublicKey).ScriptHash;
-        static Signer[] signers = new[] { new Signer { Scopes = WitnessScope.CalledByEntry, Account = contract } };
+        static string wif;  // secret key of BurgerNeo Strategist in Wallet Import Format
+        static KeyPair keypair;
+        static UInt160 contract;
+        static Signer[] signers;
 
-        static string rpc = Environment.GetEnvironmentVariable("BURGERNEO-RPC", EnvironmentVariableTarget.User)!;
-        static ProtocolSettings settings = ProtocolSettings.Load("..");
-        static RpcClient client = new RpcClient(new Uri(rpc), null, null, settings);
+        static string rpc;  // RPC URL for mainnet
+        static ProtocolSettings settings;  // config.json for mainnet
+        static RpcClient client;
 
-        static TransactionManagerFactory factory = new TransactionManagerFactory(client);
+        static TransactionManagerFactory factory;
+
+        static AutoStrategist()
+        {
+            if (os.Platform == PlatformID.Win32NT || os.Platform == PlatformID.Win32Windows)
+            {
+                wif = Environment.GetEnvironmentVariable("BURGERNEO-WIF", EnvironmentVariableTarget.User)!;
+                rpc = Environment.GetEnvironmentVariable("BURGERNEO-RPC", EnvironmentVariableTarget.User)!;
+            }
+            else
+            {
+                wif = Environment.GetEnvironmentVariable("BURGERNEO-WIF")!;
+                rpc = Environment.GetEnvironmentVariable("BURGERNEO-RPC")!;
+            }
+
+            keypair = Utility.GetKeyPair(wif);
+            contract = Contract.CreateSignatureContract(keypair.PublicKey).ScriptHash;
+            signers = new[] { new Signer { Scopes = WitnessScope.CalledByEntry, Account = contract } };
+
+            settings = ProtocolSettings.Load("..");
+            client = new RpcClient(new Uri(rpc), null, null, settings);
+            factory = new TransactionManagerFactory(client);
+        }
 
         static void Main(string[] args)
         // Read the current NEO balance of each agent
@@ -123,7 +144,7 @@ namespace BurgerNeo.Dispatcher
                 working_transfer_plans[next_agent_id] += working_transfer_plans[i];
                 working_transfer_plans[i] = 0;
 
-                // Acrually execute the transfer
+                // Actually execute the transfer
                 if (tmp_transfer_amount < 0)
                     TrigTransfer(next_agent_id, i, -tmp_transfer_amount);
                 else if (tmp_transfer_amount > 0)
