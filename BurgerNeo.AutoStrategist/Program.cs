@@ -130,7 +130,7 @@ namespace BurgerNeo.AutoStrategist
                 if (current_vote_targets[i] != voting_target_plans[i])
                     TrigVote(i, voting_target_plans[i]);
 
-                // Than re-balance NEO between agents
+                // Then re-balance NEO between agents
                 if (working_transfer_plans[i] == 0) continue;
 
                 // Find the next agent that needs transfer
