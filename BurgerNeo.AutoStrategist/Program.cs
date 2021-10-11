@@ -163,7 +163,7 @@ namespace BurgerNeo.AutoStrategist
         static UInt256 ExecuteAndRelayTransaction(byte[] script, Signer[] _signers)
         {
             // Needs extra test
-            var result = client.InvokeScriptAsync(script, signers).GetAwaiter().GetResult();
+            var result = client.InvokeScriptAsync(script, _signers).GetAwaiter().GetResult();
             if(result.State == VMState.HALT)
             {
                 TransactionManager manager = factory.MakeTransactionAsync(script!, _signers).GetAwaiter().GetResult();
