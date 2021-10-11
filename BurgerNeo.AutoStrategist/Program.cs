@@ -48,7 +48,7 @@ namespace BurgerNeo.AutoStrategist
             contract = Contract.CreateSignatureContract(keypair.PublicKey).ScriptHash;
             signers = new[] { new Signer { Scopes = WitnessScope.CalledByEntry, Account = contract } };
 
-            settings = ProtocolSettings.Load("..");
+            settings = ProtocolSettings.Load("/dev/stdin");
             client = new RpcClient(new Uri(rpc), null, null, settings);
             factory = new TransactionManagerFactory(client);
         }
