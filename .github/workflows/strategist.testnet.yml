@@ -1,0 +1,25 @@
+name: strategist (testnet)
+
+on: workflow_dispatch
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 5.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Run
+      run: echo ${{ secrets.CONFIG_TESTNET }} | dotnet run --project BurgerNeo.AutoStrategist
+      env:
+        BURGERNEO_RPC: ${{ secrets.BURGERNEO_RPC_TESTNET }}
+        BURGERNEO_TRANSFER_PLANS: ${{ secrets.BURGERNEO_TRANSFER_PLANS }}  # list of how each agent should change its NEO balance. Positive value for receiving extra NEO.
+        BURGERNEO_VOTING_TARGET_PLANS: ${{secrets.BURGERNEO_VOTING_TARGET_PLANS}}  # list of which candidate each agent should vote for
+        BURGERNEO_WIF: ${{secrets.BURGERNEO_WIF}}
+
