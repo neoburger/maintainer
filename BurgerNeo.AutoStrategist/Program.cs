@@ -61,10 +61,13 @@ namespace BurgerNeo.AutoStrategist
         {
             // List of candidates' publicKey
             List<string> voting_target_plans = ReadEnvironmentVariableAsStringArray("BURGERNEO-VOTING-TARGET-PLANS")!.ToList();
+            LogList("voting_target_plans", voting_target_plans);
+
             // List of the plan of change of NEOs of each agent.
             // Positive value means this agent needs extra NEO.
             // Negative value means this agent should send NEO to other agents.
             List<BigInteger> transfer_plans = Array.ConvertAll(ReadEnvironmentVariableAsStringArray("BURGERNEO-TRANSFER-PLANS"), BigInteger.Parse)!.ToList();
+            LogList("transfer_plans", transfer_plans);
 
             if (voting_target_plans.Count != transfer_plans.Count)
                 throw new ArgumentException($"voting_target_plans.Count != transfer_plans.Count; got {voting_target_plans.Count} and {transfer_plans.Count}");
@@ -73,10 +76,16 @@ namespace BurgerNeo.AutoStrategist
                 throw new ArithmeticException($"Sum of BURGERNEO-TRANSFER-PLANS must be 0; got {sum_transfer_plans}");
 
             // agent scripthashes
-            List<string> agents = client.InvokeScriptAsync(
+            var tmp_agents = client.InvokeScriptAsync(
                 Convert.FromBase64String("AAARwB8MBWFnZW50DBQqTJpNQCJniwPvG74INPlmRg3ESEFifVtSAAERwB8MBWFnZW50DBQqTJpNQCJniwPvG74INPlmRg3ESEFifVtSAAIRwB8MBWFnZW50DBQqTJpNQCJniwPvG74INPlmRg3ESEFifVtSAAMRwB8MBWFnZW50DBQqTJpNQCJniwPvG74INPlmRg3ESEFifVtSAAQRwB8MBWFnZW50DBQqTJpNQCJniwPvG74INPlmRg3ESEFifVtSAAURwB8MBWFnZW50DBQqTJpNQCJniwPvG74INPlmRg3ESEFifVtSAAYRwB8MBWFnZW50DBQqTJpNQCJniwPvG74INPlmRg3ESEFifVtSAAcRwB8MBWFnZW50DBQqTJpNQCJniwPvG74INPlmRg3ESEFifVtSAAgRwB8MBWFnZW50DBQqTJpNQCJniwPvG74INPlmRg3ESEFifVtSAAkRwB8MBWFnZW50DBQqTJpNQCJniwPvG74INPlmRg3ESEFifVtSAAoRwB8MBWFnZW50DBQqTJpNQCJniwPvG74INPlmRg3ESEFifVtSAAsRwB8MBWFnZW50DBQqTJpNQCJniwPvG74INPlmRg3ESEFifVtSAAwRwB8MBWFnZW50DBQqTJpNQCJniwPvG74INPlmRg3ESEFifVtSAA0RwB8MBWFnZW50DBQqTJpNQCJniwPvG74INPlmRg3ESEFifVtSAA4RwB8MBWFnZW50DBQqTJpNQCJniwPvG74INPlmRg3ESEFifVtSAA8RwB8MBWFnZW50DBQqTJpNQCJniwPvG74INPlmRg3ESEFifVtSABARwB8MBWFnZW50DBQqTJpNQCJniwPvG74INPlmRg3ESEFifVtSABERwB8MBWFnZW50DBQqTJpNQCJniwPvG74INPlmRg3ESEFifVtSABIRwB8MBWFnZW50DBQqTJpNQCJniwPvG74INPlmRg3ESEFifVtSABMRwB8MBWFnZW50DBQqTJpNQCJniwPvG74INPlmRg3ESEFifVtSABQRwB8MBWFnZW50DBQqTJpNQCJniwPvG74INPlmRg3ESEFifVtS")
-                ).GetAwaiter().GetResult().Stack.ToList().FindAll(i => !(i.IsNull)).Select(i => "0x" + BytesToString((byte[])i.ToParameter().Value, true)).ToList();
-            if(agents.Count != voting_target_plans.Count)
+                ).GetAwaiter().GetResult().Stack.ToList();
+            // Find indices where Agent(index)!=null;
+            List<int> not_null_agent_indices = tmp_agents.Where(item => item.IsNull == false).Select((item, index) => index).ToList();
+            LogList("not_null_agent_indices", not_null_agent_indices);
+            // List agent scripthashes
+            List<string> agents = tmp_agents.FindAll(i => !(i.IsNull)).Select(i => "0x" + BytesToString((byte[])i.ToParameter().Value, true)).ToList();
+            LogList("agents", agents);
+            if (agents.Count != voting_target_plans.Count)
                 throw new ArgumentException($"agents.Count != voting_target_plans.Count; got {agents.Count} and {voting_target_plans.Count}");
 
             // current NEO balances and vote targets of each agent
@@ -120,35 +129,58 @@ namespace BurgerNeo.AutoStrategist
             }
             Console.WriteLine($"planned_reward {planned_reward} > 1.1 * current reward {current_reward}\nExecute our plan!");
 
+
+
+            // current state (an example):
+            // not_null_agent_indices: [0, 2, 5]
+            //     Only Agent(0,2,5) in the BurgerNeo contract has effective values
+            // transfer_plans: [10, 0, -10]
+            //     Agent(5) should give 10 NEOs to Agent(0). No other transfer needed.
+            // voting_target_plans: ["a", "b", "c"]
+            //     Agent(0) should vote for candidate "a"; Agent(2) should vote for candidate "b"
+
             // Execute the plan
-            BigInteger tmp_transfer_amount;
-            int next_agent_id;
+
+            // A copy of transfer_plans to plan for intermediate transfer steps
             List<BigInteger> working_transfer_plans = transfer_plans.ToList();
+
+            // How many NEOs should the current agent receive when the plan is executed
+            BigInteger tmp_transfer_amount;
+
+            // shared index for not_null_agent_indices and working_transfer_plans,
+            // recording which next agent should have a transfer with the current agent
+            int next_agent_id_index;
+
+            LogList("working_transfer_plans", working_transfer_plans);
             for (int i = 0; i < agents.Count; ++i)
             {
                 // First change the voting targets
                 if (current_vote_targets[i] != voting_target_plans[i])
-                    TrigVote(i, voting_target_plans[i]);
+                    TrigVote(not_null_agent_indices[i], voting_target_plans[i]);
 
                 // Then re-balance NEO between agents
                 if (working_transfer_plans[i] == 0) continue;
 
-                // Find the next agent that needs transfer
-                next_agent_id = i + 1;
-                while (working_transfer_plans[next_agent_id] == 0)
-                    next_agent_id += 1;
+                // Find the next agent that needs transfer (working_transfer_plans[some index larger than i] != 0)
+                next_agent_id_index = i + 1;
+                while (working_transfer_plans[next_agent_id_index] == 0)
+                    next_agent_id_index += 1;
+                Console.WriteLine($"next_agent_id_index: {next_agent_id_index}; Agent id in contract: {not_null_agent_indices[next_agent_id_index]}");
 
-                // Record the state after the transfer
+                // Plan to transfer between Agent(not_null_agent_indices[next_agent_id_index]) and Agent(not_null_agent_indices[i]).
+                // Record the state after the planned transfer
                 tmp_transfer_amount = working_transfer_plans[i];
-                working_transfer_plans[next_agent_id] += working_transfer_plans[i];
-                working_transfer_plans[i] = 0;
+                working_transfer_plans[next_agent_id_index] += working_transfer_plans[i];
+                working_transfer_plans[i] = 0;  // Unnecessary for correct execution, but makes working_transfer_plans.Sum() == 0
+                LogList("working_transfer_plans after next planned transfer", working_transfer_plans);
 
                 // Actually execute the transfer
-                if (tmp_transfer_amount < 0)
-                    TrigTransfer(next_agent_id, i, -tmp_transfer_amount);
-                else if (tmp_transfer_amount > 0)
-                    TrigTransfer(i, next_agent_id, tmp_transfer_amount);
+                if (tmp_transfer_amount < 0)  // Balance of current agent should be reduced. Current agent should give NEO to a following agent
+                    TrigTransfer(not_null_agent_indices[i], not_null_agent_indices[next_agent_id_index], -tmp_transfer_amount);
+                else if (tmp_transfer_amount > 0)  // Balance of current agent should be increased. A following agent should give NEO to current agent
+                    TrigTransfer(not_null_agent_indices[next_agent_id_index], not_null_agent_indices[i], tmp_transfer_amount);
             }
+            Console.WriteLine("End execution");
         }
         static UInt256 TrigVote(int agent_id, string candidate_publickey)
         {
@@ -163,7 +195,7 @@ namespace BurgerNeo.AutoStrategist
         static UInt256 ExecuteAndRelayTransaction(byte[] script, Signer[] _signers)
         {
             // Needs extra test
-            var result = client.InvokeScriptAsync(script, _signers).GetAwaiter().GetResult();
+            var result = client.InvokeScriptAsync(script!, _signers).GetAwaiter().GetResult();
             if(result.State == VMState.HALT)
             {
                 TransactionManager manager = factory.MakeTransactionAsync(script!, _signers).GetAwaiter().GetResult();
@@ -175,6 +207,19 @@ namespace BurgerNeo.AutoStrategist
             else
                 throw new ArgumentException($"Exception from Neo: {result.Exception}");
         }
+
+        static void LogList<T>(string name, List<T> list, bool writeline = false)
+        {
+            if (writeline)
+                Console.WriteLine($"{name}: ");
+            else
+                Console.Write($"{name}: ");
+            Console.Write("[");
+            list.ForEach(i => Console.Write($"{i}, "));
+            Console.Write("]");
+            Console.WriteLine();// Console.WriteLine();
+        }
+
         static string BytesToString(byte[] input_bytes, bool reverse=false)
         {
             if (reverse)
