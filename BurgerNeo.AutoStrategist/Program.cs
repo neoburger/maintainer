@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Text.RegularExpressions;
 using System.Numerics;
 using System.Linq;
@@ -17,20 +16,20 @@ namespace BurgerNeo.AutoStrategist
 {
     class AutoStrategist
     {
-        static OperatingSystem os = System.Environment.OSVersion;
-        static UInt160 burgerneo_contract = UInt160.Parse("0x48c40d4666f93408be1bef038b6722404d9a4c2a");
-        static UInt160 neo_contract = NativeContract.NEO.Hash;
+        static readonly OperatingSystem os = Environment.OSVersion;
+        static readonly UInt160 burgerneo_contract = UInt160.Parse("0x48c40d4666f93408be1bef038b6722404d9a4c2a");
+        static readonly UInt160 neo_contract = NativeContract.NEO.Hash;
 
-        static string wif;  // secret key of BurgerNeo Strategist in Wallet Import Format
-        static KeyPair keypair;
-        static UInt160 contract;
-        static Signer[] signers;
+        static readonly string wif;  // secret key of BurgerNeo Strategist in Wallet Import Format
+        static readonly KeyPair keypair;
+        static readonly UInt160 contract;
+        static readonly Signer[] signers;
 
-        static string rpc;  // RPC URL for mainnet
-        static ProtocolSettings settings;  // config.json for mainnet
-        static RpcClient client;
+        static readonly string rpc;  // RPC URL for mainnet
+        static readonly ProtocolSettings settings;  // config.json for mainnet
+        static readonly RpcClient client;
 
-        static TransactionManagerFactory factory;
+        static readonly TransactionManagerFactory factory;
 
         static AutoStrategist()
         {
@@ -54,7 +53,7 @@ namespace BurgerNeo.AutoStrategist
             factory = new TransactionManagerFactory(client);
         }
 
-        static void Main(string[] args)
+        static void Main()
         // Read the current NEO balance of each agent
         // Read the plan of changing NEO balance
         // Coompute the GAS reward of the new plan
@@ -100,13 +99,13 @@ namespace BurgerNeo.AutoStrategist
 
             // Current voting vector
             Dictionary<string, int> candidate_at_index = candidates.Select((v, i) => new { v, i }).ToDictionary(x => x.v, x => x.i);
-            List<BigInteger> my_votes = new List<BigInteger>(new BigInteger[candidate_at_index.Count]);
+            List<BigInteger> my_votes = new(new BigInteger[candidate_at_index.Count]);
             foreach(var can_w_v in current_vote_targets.Zip(neo_balances, (t, v) => new { target = t, vote = v }))
                 my_votes[candidate_at_index[can_w_v.target]] += can_w_v.vote;
 
             // Planned voting vector
             List<BigInteger> planned_neo_balances = neo_balances.Zip(transfer_plans, (x, y) => x + y).ToList();
-            List<BigInteger> planned_my_votes = new List<BigInteger>(new BigInteger[candidate_at_index.Count]);
+            List<BigInteger> planned_my_votes = new(new BigInteger[candidate_at_index.Count]);
             foreach (var can_w_v in voting_target_plans.Zip(planned_neo_balances, (t, v) => new { target = t, vote = v }))
                 planned_my_votes[candidate_at_index[can_w_v.target]] += can_w_v.vote;
 
