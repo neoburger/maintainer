@@ -150,15 +150,15 @@ namespace BurgerNeo.AutoStrategist
                     TrigTransfer(i, next_agent_id, tmp_transfer_amount);
             }
         }
-        static void TrigVote(int agent_id, string candidate_publickey)
+        static UInt256 TrigVote(int agent_id, string candidate_publickey)
         {
             Console.WriteLine($"start trigVote(agent_id={agent_id}, target={candidate_publickey})");
-            ExecuteAndRelayTransaction(burgerneo_contract.MakeScript("trigVote", agent_id, candidate_publickey), signers);
+            return ExecuteAndRelayTransaction(burgerneo_contract.MakeScript("trigVote", agent_id, candidate_publickey), signers);
         }
-        static void TrigTransfer(int agent_id_from, int agent_id_to, BigInteger amount)
+        static UInt256 TrigTransfer(int agent_id_from, int agent_id_to, BigInteger amount)
         {
             Console.WriteLine($"start trigTransfer(agent_id_from={agent_id_from}, agent_id_to={agent_id_to}, amount={amount})");
-            ExecuteAndRelayTransaction(burgerneo_contract.MakeScript("trigTransfer", agent_id_from, agent_id_to, amount), signers);
+            return ExecuteAndRelayTransaction(burgerneo_contract.MakeScript("trigTransfer", agent_id_from, agent_id_to, amount), signers);
         }
         static UInt256 ExecuteAndRelayTransaction(byte[] script, Signer[] _signers)
         {
