@@ -35,13 +35,13 @@ namespace BurgerNeo.AutoStrategist
         {
             if (os.Platform == PlatformID.Win32NT || os.Platform == PlatformID.Win32Windows)
             {
-                wif = Environment.GetEnvironmentVariable("BURGERNEO-WIF", EnvironmentVariableTarget.User)!;
-                rpc = Environment.GetEnvironmentVariable("BURGERNEO-RPC", EnvironmentVariableTarget.User)!;
+                wif = Environment.GetEnvironmentVariable("BURGERNEO_WIF", EnvironmentVariableTarget.User)!;
+                rpc = Environment.GetEnvironmentVariable("BURGERNEO_RPC", EnvironmentVariableTarget.User)!;
             }
             else
             {
-                wif = Environment.GetEnvironmentVariable("BURGERNEO-WIF")!;
-                rpc = Environment.GetEnvironmentVariable("BURGERNEO-RPC")!;
+                wif = Environment.GetEnvironmentVariable("BURGERNEO_WIF")!;
+                rpc = Environment.GetEnvironmentVariable("BURGERNEO_RPC")!;
             }
 
             keypair = Utility.GetKeyPair(wif);
@@ -60,20 +60,20 @@ namespace BurgerNeo.AutoStrategist
         // If the plan yields more than 110% that of the current status, re-balance NEO among agents to execute the new plan
         {
             // List of candidates' publicKey
-            List<string> voting_target_plans = ReadEnvironmentVariableAsStringArray("BURGERNEO-VOTING-TARGET-PLANS")!.ToList();
+            List<string> voting_target_plans = ReadEnvironmentVariableAsStringArray("BURGERNEO_VOTING_TARGET_PLANS")!.ToList();
             LogList("voting_target_plans", voting_target_plans);
 
             // List of the plan of change of NEOs of each agent.
             // Positive value means this agent needs extra NEO.
             // Negative value means this agent should send NEO to other agents.
-            List<BigInteger> transfer_plans = Array.ConvertAll(ReadEnvironmentVariableAsStringArray("BURGERNEO-TRANSFER-PLANS"), BigInteger.Parse)!.ToList();
+            List<BigInteger> transfer_plans = Array.ConvertAll(ReadEnvironmentVariableAsStringArray("BURGERNEO_TRANSFER_PLANS"), BigInteger.Parse)!.ToList();
             LogList("transfer_plans", transfer_plans);
 
             if (voting_target_plans.Count != transfer_plans.Count)
                 throw new ArgumentException($"voting_target_plans.Count != transfer_plans.Count; got {voting_target_plans.Count} and {transfer_plans.Count}");
             BigInteger sum_transfer_plans = transfer_plans.Sum();
             if (sum_transfer_plans != 0)
-                throw new ArithmeticException($"Sum of BURGERNEO-TRANSFER-PLANS must be 0; got {sum_transfer_plans}");
+                throw new ArithmeticException($"Sum of BURGERNEO_TRANSFER_PLANS must be 0; got {sum_transfer_plans}");
 
             // agent scripthashes
             var tmp_agents = client.InvokeScriptAsync(
