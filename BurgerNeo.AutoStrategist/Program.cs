@@ -190,11 +190,11 @@ namespace BurgerNeo.AutoStrategist
             if (os.Platform == PlatformID.Win32NT || os.Platform == PlatformID.Win32Windows) {
                 return Regex.Replace(
                     Environment.GetEnvironmentVariable(key_string, EnvironmentVariableTarget.User)!,
-                    "[\\[\\]\"\'\\s]|,\\s+\\]$", "", RegexOptions.Compiled).Split(',');
+                    "[\\[\\]\"\'\\s]|,\\s*\\]$", "", RegexOptions.Compiled).Split(',');
             } else {
                 return Regex.Replace(
                     Environment.GetEnvironmentVariable(key_string)!,
-                    "[\\[\\]\"\'\\s]|,\\s+\\]$", "", RegexOptions.Compiled).Split(',');
+                    "[\\[\\]\"\'\\s]|,\\s*\\]$", "", RegexOptions.Compiled).Split(',');
             }
         }
 
