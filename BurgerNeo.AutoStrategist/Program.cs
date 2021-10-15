@@ -11,6 +11,7 @@ using Neo.SmartContract.Native;
 using Neo.Wallets;
 using Neo.VM;
 using Utility = Neo.Network.RPC.Utility;
+using GAMS;
 
 namespace BurgerNeo.AutoStrategist
 {
@@ -55,25 +56,25 @@ namespace BurgerNeo.AutoStrategist
 
         static void Main()
         // Read the current NEO balance of each agent
-        // Read the plan of changing NEO balance
-        // Coompute the GAS reward of the new plan
+        // Generate the plan of changing NEO balance
+        // Compute the GAS reward of the new plan
         // If the plan yields more than 110% that of the current status, re-balance NEO among agents to execute the new plan
         {
             // List of candidates' publicKey
-            List<string> voting_target_plans = ReadEnvironmentVariableAsStringArray("BURGERNEO_VOTING_TARGET_PLANS")!.ToList();
-            LogList("voting_target_plans", voting_target_plans);
+            //List<string> voting_target_plans = ReadEnvironmentVariableAsStringArray("BURGERNEO_VOTING_TARGET_PLANS")!.ToList();
+            //LogList("voting_target_plans", voting_target_plans);
 
             // List of the plan of change of NEOs of each agent.
             // Positive value means this agent needs extra NEO.
             // Negative value means this agent should send NEO to other agents.
-            List<BigInteger> transfer_plans = Array.ConvertAll(ReadEnvironmentVariableAsStringArray("BURGERNEO_TRANSFER_PLANS"), BigInteger.Parse)!.ToList();
-            LogList("transfer_plans", transfer_plans);
+            //List<BigInteger> transfer_plans = Array.ConvertAll(ReadEnvironmentVariableAsStringArray("BURGERNEO_TRANSFER_PLANS"), BigInteger.Parse)!.ToList();
+            //LogList("transfer_plans", transfer_plans);
 
-            if (voting_target_plans.Count != transfer_plans.Count)
-                throw new ArgumentException($"voting_target_plans.Count != transfer_plans.Count; got {voting_target_plans.Count} and {transfer_plans.Count}");
-            BigInteger sum_transfer_plans = transfer_plans.Sum();
-            if (sum_transfer_plans != 0)
-                throw new ArithmeticException($"Sum of BURGERNEO_TRANSFER_PLANS must be 0; got {sum_transfer_plans}");
+            //if (voting_target_plans.Count != transfer_plans.Count)
+            //    throw new ArgumentException($"voting_target_plans.Count != transfer_plans.Count; got {voting_target_plans.Count} and {transfer_plans.Count}");
+            //BigInteger sum_transfer_plans = transfer_plans.Sum();
+            //if (sum_transfer_plans != 0)
+            //    throw new ArithmeticException($"Sum of BURGERNEO_TRANSFER_PLANS must be 0; got {sum_transfer_plans}");
 
             // agent scripthashes
             var tmp_agents = client.InvokeScriptAsync(
@@ -85,8 +86,8 @@ namespace BurgerNeo.AutoStrategist
             // List agent scripthashes
             List<string> agents = tmp_agents.FindAll(i => !(i.IsNull)).Select(i => "0x" + BytesToString((byte[])i.ToParameter().Value, true)).ToList();
             LogList("agents", agents);
-            if (agents.Count != voting_target_plans.Count)
-                throw new ArgumentException($"agents.Count != voting_target_plans.Count; got {agents.Count} and {voting_target_plans.Count}");
+            //if (agents.Count != voting_target_plans.Count)
+            //    throw new ArgumentException($"agents.Count != voting_target_plans.Count; got {agents.Count} and {voting_target_plans.Count}");
 
             // current NEO balances and vote targets of each agent
             var account_state_awaiters = agents.Select(i => client.InvokeScriptAsync(neo_contract.MakeScript("getAccountState", UInt160.Parse(i))).GetAwaiter());
@@ -112,11 +113,30 @@ namespace BurgerNeo.AutoStrategist
             foreach(var can_w_v in current_vote_targets.Zip(neo_balances, (t, v) => new { target = t, vote = v }))
                 my_votes[candidate_at_index[can_w_v.target]] += can_w_v.vote;
 
+            // Generate planned voting vector
+            List<BigInteger> planned_my_votes = FindVotingVector(others_votes, neo_balances.Sum(), neo_balances.Count);
+            List<BigInteger> planned_my_votes_of_agent = new();
+            List<string> voting_target_plans = new();
+            foreach ((BigInteger vote, int index) in planned_my_votes.Select((value, i) => (value, i)))
+                if(vote > 0)
+                {
+                    voting_target_plans.Add(candidates[index]);
+                    planned_my_votes_of_agent.Add(vote);
+                }
+            LogList("planned voting vector", planned_my_votes);
+            if(planned_my_votes_of_agent.Count != agents.Count)
+                throw new ArgumentException($"planned_my_votes_of_agent.Count != agents.Count; got {planned_my_votes_of_agent.Count} and {agents.Count}");
+            List<BigInteger> transfer_plans = planned_my_votes_of_agent.Zip(neo_balances, (x, y) => x - y).ToList();
+            LogList("transfer_plans", transfer_plans);
+            BigInteger sum_transfer_plans = transfer_plans.Sum();
+            if (sum_transfer_plans != 0)
+                throw new ArithmeticException($"Sum of transfer_plans must be 0; got {sum_transfer_plans}");
+
             // Planned voting vector
-            List<BigInteger> planned_neo_balances = neo_balances.Zip(transfer_plans, (x, y) => x + y).ToList();
-            List<BigInteger> planned_my_votes = new(new BigInteger[candidate_at_index.Count]);
-            foreach (var can_w_v in voting_target_plans.Zip(planned_neo_balances, (t, v) => new { target = t, vote = v }))
-                planned_my_votes[candidate_at_index[can_w_v.target]] += can_w_v.vote;
+            //List<BigInteger> planned_neo_balances = neo_balances.Zip(transfer_plans, (x, y) => x + y).ToList();
+            //List<BigInteger> planned_my_votes = new(new BigInteger[candidate_at_index.Count]);
+            //foreach (var can_w_v in voting_target_plans.Zip(planned_neo_balances, (t, v) => new { target = t, vote = v }))
+            //    planned_my_votes[candidate_at_index[can_w_v.target]] += can_w_v.vote;
 
             // Compare rewards of current and planned voting vector
             decimal current_reward = CalcReward(others_votes, my_votes);
@@ -241,6 +261,67 @@ namespace BurgerNeo.AutoStrategist
                     Environment.GetEnvironmentVariable(key_string)!,
                     "[\\[\\]\"\'\\s]|,\\s*\\]$", "", RegexOptions.Compiled).Split(',');
             }
+        }
+
+        static string GenGAMSCodes(List<BigInteger> others_votes, BigInteger our_NEOs, int num_agents)
+        {
+            List<int> candidate_index_list = Enumerable.Range(0, others_votes.Count).ToList();
+            string candidate_index_str = String.Join(",", candidate_index_list);
+            string Vi = String.Join("\n", others_votes.Select((item, index) => $"{index} {item}").ToList());
+            List<BigInteger> reward_factor = new List<BigInteger> { 200, 200, 200, 200, 200, 200, 200 }
+                .Concat(new List<BigInteger> { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 })
+                .Concat(new List<BigInteger>(new BigInteger[others_votes.Count - 21])).ToList();
+            string reward_factor_string = String.Join("\n", reward_factor.Select((item, index) => $"{index} {item}").ToList());
+            return @"
+Set i ""candidate index"" /
+" + candidate_index_str + @"
+    /;
+    Parameters
+        V(i) ""other people's votes"" /
+    "+ Vi + @"
+       /
+        NEO  ""our NEOs"" /" + our_NEOs + @"/
+        num_agents  ""our num of agents"" /" + num_agents + @"/
+        reward_factor(i) ""how much gas is given by the candidate at each rank"" /
+        " + reward_factor_string +
+        @"
+        /;
+        
+    Integer Variable vote(i) ""voting vector that needs to be optimized"";
+    vote.up(i) = NEO;
+            Free Variable GAS_reward ""total GAS reward"";
+
+            Binary Variable is_nonzero(i) ""whether an element in the voting vector is zero"";
+            Integer Variable count_nonzero ""count of nonzero values in vote(i)"";
+
+
+            Equations
+                GAS_reward_eqn ""the reward according to our voting vector v""
+        sum_v_eqn ""sum of voting vector equals num of our NEOs""
+        is_nonzero_eqn(i) ""whether the element vote(i) is not zero""
+        num_agents_eqn ""sum of nonzero element in voting vector does not exceed num of our agents"";
+
+            GAS_reward_eqn.. GAS_reward =e= sum(i, reward_factor(i) * vote(i) / (V(i) + vote(i) + 0.000001));
+            sum_v_eqn.. NEO =e= sum(i, vote(i));
+            is_nonzero_eqn(i).. vote(i) =l= is_nonzero(i) * vote.up(i);
+            num_agents_eqn.. sum(i, is_nonzero(i)) =l= num_agents;
+
+            Model NEOBurger / all /;
+            Option MINLP = lindoglobal, optcr = 0, threads = 0;
+            Solve NEOBurger using MINLP maximizing GAS_reward;
+            ";
+        }
+
+        static List<BigInteger> FindVotingVector(List<BigInteger> others_votes, BigInteger our_NEOs, int num_agents)
+        {
+            GAMSWorkspace ws = new GAMSWorkspace();
+            string codes = GenGAMSCodes(others_votes, our_NEOs, num_agents);
+            GAMSJob t = ws.AddJobFromString(codes);
+            t.Run();
+            List<BigInteger> voting_vector = new();
+            foreach (GAMSVariableRecord vote in t.OutDB.GetVariable("vote"))
+                voting_vector.Add((BigInteger)vote.Level);
+            return voting_vector;
         }
 
         static decimal CalcReward(List<BigInteger> others_votes, List<BigInteger> voting_vector)
