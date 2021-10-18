@@ -221,7 +221,7 @@ namespace BurgerNeo.AutoStrategist
                 TransactionManager manager = factory.MakeTransactionAsync(script!, _signers).GetAwaiter().GetResult();
                 Transaction tx = manager.AddSignature(keypair).SignAsync().GetAwaiter().GetResult();
                 UInt256 txid = client.SendRawTransactionAsync(tx).GetAwaiter().GetResult();
-                Console.WriteLine($"relayed txid: {txid}");
+                Console.WriteLine($"relayed txid: {txid.ToString()}");
                 return txid;
             }
             else
