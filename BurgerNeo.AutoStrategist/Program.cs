@@ -276,40 +276,39 @@ namespace BurgerNeo.AutoStrategist
 Set i ""candidate index"" /
 " + candidate_index_str + @"
     /;
-    Parameters
-        V(i) ""other people's votes"" /
+Parameters
+    V(i) ""other people's votes"" /
     "+ Vi + @"
-       /
-        NEO  ""our NEOs"" /" + our_NEOs + @"/
-        num_agents  ""our num of agents"" /" + num_agents + @"/
-        reward_factor(i) ""how much gas is given by the candidate at each rank"" /
-        " + reward_factor_string +
-        @"
-        /;
+    /
+    NEO  ""our NEOs"" /" + our_NEOs + @"/
+    num_agents  ""our num of agents"" /" + num_agents + @"/
+    reward_factor(i) ""how much gas is given by the candidate at each rank"" /
+    " + reward_factor_string +
+    @"
+    /;
         
-    Integer Variable vote(i) ""voting vector that needs to be optimized"";
-    vote.up(i) = NEO;
-            Free Variable GAS_reward ""total GAS reward"";
+Integer Variable vote(i) ""voting vector that needs to be optimized"";
+vote.up(i) = NEO;
+Free Variable GAS_reward ""total GAS reward"";
 
-            Binary Variable is_nonzero(i) ""whether an element in the voting vector is zero"";
-            Integer Variable count_nonzero ""count of nonzero values in vote(i)"";
+Binary Variable is_nonzero(i) ""whether an element in the voting vector is zero"";
+Integer Variable count_nonzero ""count of nonzero values in vote(i)"";
 
+Equations
+    GAS_reward_eqn ""the reward according to our voting vector v""
+    sum_v_eqn ""sum of voting vector equals num of our NEOs""
+    is_nonzero_eqn(i) ""whether the element vote(i) is not zero""
+    num_agents_eqn ""sum of nonzero element in voting vector does not exceed num of our agents"";
 
-            Equations
-                GAS_reward_eqn ""the reward according to our voting vector v""
-        sum_v_eqn ""sum of voting vector equals num of our NEOs""
-        is_nonzero_eqn(i) ""whether the element vote(i) is not zero""
-        num_agents_eqn ""sum of nonzero element in voting vector does not exceed num of our agents"";
+GAS_reward_eqn.. GAS_reward =e= sum(i, reward_factor(i) * vote(i) / (V(i) + vote(i) + 0.000001));
+sum_v_eqn.. NEO =e= sum(i, vote(i));
+is_nonzero_eqn(i).. vote(i) =l= is_nonzero(i) * vote.up(i);
+num_agents_eqn.. sum(i, is_nonzero(i)) =l= num_agents;
 
-            GAS_reward_eqn.. GAS_reward =e= sum(i, reward_factor(i) * vote(i) / (V(i) + vote(i) + 0.000001));
-            sum_v_eqn.. NEO =e= sum(i, vote(i));
-            is_nonzero_eqn(i).. vote(i) =l= is_nonzero(i) * vote.up(i);
-            num_agents_eqn.. sum(i, is_nonzero(i)) =l= num_agents;
-
-            Model NEOBurger / all /;
-            Option MINLP = lindoglobal, optcr = 0, threads = 0;
-            Solve NEOBurger using MINLP maximizing GAS_reward;
-            ";
+Model NEOBurger / all /;
+Option MINLP = lindoglobal, optcr = 0, threads = 0;
+Solve NEOBurger using MINLP maximizing GAS_reward;
+";
         }
 
         static List<BigInteger> FindVotingVector(List<BigInteger> others_votes, BigInteger our_NEOs, int num_agents)
