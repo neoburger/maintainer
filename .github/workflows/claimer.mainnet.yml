@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   
   schedule:
-  - cron: "0 0 * * *"
+  - cron: "0 0,8,16 * * *"
 
 jobs:
   build:
@@ -19,9 +19,16 @@ jobs:
         dotnet-version: 5.0.x
     - name: Restore dependencies
       run: dotnet restore
-    - name: Run
+    - name: Run0
       run: echo ${{ secrets.CONFIG_MAINNET }} | dotnet run --project claimer
       env:
         WIF: ${{ secrets.WIF }}
         RPC: ${{ secrets.RPC_MAINNET }}
         AGENT: ${{ secrets.AGENT_0 }}
+    - name: Run1
+      run: echo ${{ secrets.CONFIG_MAINNET }} | dotnet run --project claimer
+      env:
+        WIF: ${{ secrets.WIF }}
+        RPC: ${{ secrets.RPC_MAINNET }}
+        AGENT: ${{ secrets.AGENT_1 }}
+
