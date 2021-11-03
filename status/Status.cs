@@ -17,6 +17,8 @@ namespace Neo.Plugins
         private static readonly uint UNTIL = uint.Parse(Environment.GetEnvironmentVariable("UNTIL") ?? "999999999");
         void IPersistencePlugin.OnPersist(NeoSystem system, Block block, DataCache snapshot, IReadOnlyList<Blockchain.ApplicationExecuted> applicationExecutedList)
         {
+            Console.Error.WriteLine($"DEBUG: {block.Index} - {UNTIL}");
+            Console.Error.Flush();
             if (block.Index > UNTIL)
             {
                 Environment.Exit(0);
