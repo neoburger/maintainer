@@ -17,15 +17,13 @@ namespace Neo.Plugins
         private static readonly uint UNTIL = uint.Parse(Environment.GetEnvironmentVariable("UNTIL") ?? "999999999");
         void IPersistencePlugin.OnPersist(NeoSystem system, Block block, DataCache snapshot, IReadOnlyList<Blockchain.ApplicationExecuted> applicationExecutedList)
         {
-            Console.Error.WriteLine($"DEBUG: {block.Index} - {UNTIL}");
-            Console.Error.Flush();
+            Console.Error.WriteLine($"SYNC: {block.Index} / {UNTIL}");
             if (block.Index > UNTIL)
             {
                 Environment.Exit(0);
             }
             Console.OutputEncoding = Encoding.ASCII;
             Console.WriteLine();
-            Console.Error.WriteLine($"SYNCING BLOCK: {block.Index}");
             ApplicationEngine ts = ApplicationEngine.Run(BNEO.MakeScript("totalSupply"), snapshot, settings: system.Settings);
             ApplicationEngine rps = ApplicationEngine.Run(BNEO.MakeScript("rPS"), snapshot, settings: system.Settings);
             if (ts.State != VMState.HALT || rps.State != VMState.HALT)
