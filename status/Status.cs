@@ -14,9 +14,10 @@ namespace Neo.Plugins
     public class Status : Plugin, IPersistencePlugin
     {
         private static readonly UInt160 BNEO = UInt160.Parse("0x48c40d4666f93408be1bef038b6722404d9a4c2a");
+        private static readonly uint UNTIL = uint.Parse(Environment.GetEnvironmentVariable("UNTIL") ?? "999999999");
         void IPersistencePlugin.OnPersist(NeoSystem system, Block block, DataCache snapshot, IReadOnlyList<Blockchain.ApplicationExecuted> applicationExecutedList)
         {
-            if (block.Index > uint.Parse(Environment.GetEnvironmentVariable("UNTIL") ?? "999999999"))
+            if (block.Index > UNTIL)
             {
                 Environment.Exit(0);
             }
