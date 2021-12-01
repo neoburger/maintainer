@@ -31,4 +31,15 @@ jobs:
         WIF: ${{ secrets.WIF }}
         RPC: ${{ secrets.RPC_MAINNET }}
         AGENT: ${{ secrets.AGENT_1 }}
-
+    - name: Run2
+      run: echo ${{ secrets.CONFIG_MAINNET }} | dotnet run --project claimer
+      env:
+        WIF: ${{ secrets.WIF }}
+        RPC: ${{ secrets.RPC_MAINNET }}
+        AGENT: ${{ secrets.AGENT_2 }}
+    - name: Run3
+      run: echo ${{ secrets.CONFIG_MAINNET }} | dotnet run --project claimer
+      env:
+        WIF: ${{ secrets.WIF }}
+        RPC: ${{ secrets.RPC_MAINNET }}
+        AGENT: ${{ secrets.AGENT_3 }}
